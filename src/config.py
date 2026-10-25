@@ -38,12 +38,18 @@ def build_parser():
         description="Граф зависимостей пакетов NuGet",
         add_help=True,
     )
-    parser.add_argument("--package", default="")
-    parser.add_argument("--version", default="")
-    parser.add_argument("--repo", default=DEFAULT_REPO)
-    parser.add_argument("--test-repo", action="store_true")
-    parser.add_argument("--tree", action="store_true")
-    parser.add_argument("--max-depth", default=DEFAULT_DEPTH)
+    parser.add_argument("--package", default="",
+                        help="имя анализируемого пакета")
+    parser.add_argument("--version", default="",
+                        help="версия пакета")
+    parser.add_argument("--repo", default=DEFAULT_REPO,
+                        help="URL репозитория или путь к тестовому файлу")
+    parser.add_argument("--test-repo", action="store_true",
+                        help="режим работы с тестовым репозиторием")
+    parser.add_argument("--tree", action="store_true",
+                        help="вывод зависимостей в виде ASCII-дерева")
+    parser.add_argument("--max-depth", default=DEFAULT_DEPTH,
+                        help="максимальная глубина анализа (1-10)")
     return parser
 
 
