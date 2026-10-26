@@ -7,3 +7,4 @@ venv/
 build/
 *.zip
 *.nupkg
+.DS_Store

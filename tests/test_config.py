@@ -12,30 +12,31 @@ from errors import AppError
 GRAPH = str(Path(__file__).parent / "data" / "graph.txt")
 
 
+def default_config():
+    """Создаёт конфигурацию с минимальным набором параметров."""
+    return build_config(["--package", "Serilog", "--version", "3.1.1"])
+
+
 class TestDefaults(unittest.TestCase):
     """Тесты значений по умолчанию."""
 
-    def setUp(self):
-        """Создаёт конфигурацию с минимальным набором параметров."""
-        self.config = build_config(["--package", "Serilog",
-                                    "--version", "3.1.1"])
-
     def test_repo(self):
         """Без параметра используется адрес репозитория NuGet."""
-        self.assertEqual(self.config.repo, DEFAULT_REPO)
+        self.assertEqual(default_config().repo, DEFAULT_REPO)
 
     def test_depth(self):
         """Глубина по умолчанию равна трём."""
-        self.assertEqual(self.config.depth, 3)
+        self.assertEqual(default_config().depth, 3)
 
     def test_flags(self):
         """Режимы выключены, пока их не включил пользователь."""
-        self.assertFalse(self.config.test_repo)
-        self.assertFalse(self.config.tree)
+        config = default_config()
+        self.assertFalse(config.test_repo)
+        self.assertFalse(config.tree)
 
     def test_describe(self):
         """Описание содержит строку с именем пакета."""
-        self.assertIn("package = Serilog", describe(self.config))
+        self.assertIn("package = Serilog", describe(default_config()))
 
 
 class TestValues(unittest.TestCase):

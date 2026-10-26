@@ -4,7 +4,7 @@ import io
 import json
 import urllib.error
 import urllib.request
-import xml.etree.ElementTree as ElementTree
+import xml.etree.ElementTree as element_tree
 import zipfile
 
 from errors import AppError
@@ -148,8 +148,8 @@ def read_dependencies_block(block):
 def parse_dependencies(nuspec):
     """Разбирает .nuspec и возвращает зависимости по платформам."""
     try:
-        root = ElementTree.fromstring(nuspec)
-    except ElementTree.ParseError:
+        root = element_tree.fromstring(nuspec)
+    except element_tree.ParseError:
         raise AppError("не удалось разобрать файл .nuspec")
     for element in root.iter():
         if local_name(element) == DEPENDENCIES_TAG:
