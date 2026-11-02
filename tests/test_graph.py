@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from file_source import FileSource
-from graph import boundary_packages, build_graph, find_cycles
+from graph import boundary_packages, build_graph, find_cycles, load_order
 
 DATA = Path(__file__).parent / "data"
 DEPTH = 5
@@ -66,6 +66,36 @@ class TestCycles(unittest.TestCase):
     def test_self_loop(self):
         """Пакет, зависящий сам от себя, — тоже цикл."""
         self.assertEqual(find_cycles({"A": ["A"]}, "A"), [["A", "A"]])
+
+
+class TestLoadOrder(unittest.TestCase):
+    """Тесты порядка загрузки зависимостей."""
+
+    def test_dependencies_first(self):
+        """Каждый пакет загружается после своих зависимостей."""
+        graph = graph_from_file("graph.txt", DEPTH)
+        self.assertEqual(load_order(graph, "A"), ["D", "B", "C", "A"])
+
+    def test_shared_dependency_once(self):
+        """Общая зависимость загружается один раз."""
+        graph = graph_from_file("graph.txt", DEPTH)
+        self.assertEqual(load_order(graph, "A").count("D"), 1)
+
+    def test_chain(self):
+        """Цепочка загружается с конца."""
+        graph = graph_from_file("chain.txt", DEPTH)
+        self.assertEqual(load_order(graph, "A"),
+                         ["F", "E", "D", "C", "B", "A"])
+
+    def test_cycle(self):
+        """Цикл не мешает получить порядок со всеми пакетами."""
+        graph = graph_from_file("cycle.txt", DEPTH)
+        self.assertEqual(load_order(graph, "A"), ["D", "C", "B", "A"])
+
+    def test_boundary_package(self):
+        """Пакет за пределами глубины тоже попадает в порядок."""
+        graph = graph_from_file("chain.txt", 2)
+        self.assertEqual(load_order(graph, "A"), ["C", "B", "A"])
 
 
 if __name__ == "__main__":

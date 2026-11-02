@@ -33,6 +33,7 @@ class TestDefaults(unittest.TestCase):
         config = default_config()
         self.assertFalse(config.test_repo)
         self.assertFalse(config.tree)
+        self.assertFalse(config.order)
 
     def test_describe(self):
         """Описание содержит строку с именем пакета."""
@@ -46,11 +47,12 @@ class TestValues(unittest.TestCase):
         """Все параметры принимаются вместе."""
         config = build_config([
             "--package", "A", "--test-repo", "--repo", GRAPH,
-            "--tree", "--max-depth", "5",
+            "--tree", "--order", "--max-depth", "5",
         ])
         self.assertEqual(config.package, "A")
         self.assertEqual(config.depth, 5)
         self.assertTrue(config.tree)
+        self.assertTrue(config.order)
 
     def test_version_optional_in_test_mode(self):
         """В тестовом режиме версия не обязательна."""

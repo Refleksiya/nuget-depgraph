@@ -7,7 +7,12 @@ from errors import AppError
 from file_source import FileSource
 from graph import build_graph
 from nuget_source import NugetSource
-from output import print_config, print_dependencies, print_graph
+from output import (
+    print_config,
+    print_dependencies,
+    print_graph,
+    print_order,
+)
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -21,7 +26,10 @@ def make_source(config):
 
 
 def print_results(config, source, graph):
-    """Выводит прямые зависимости и граф зависимостей."""
+    """Выводит порядок загрузки или прямые зависимости и граф."""
+    if config.order:
+        print_order(source, graph, config)
+        return
     if not config.test_repo:
         print_dependencies(config, source.groups[config.package])
     print_graph(source, graph, config)

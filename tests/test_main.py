@@ -76,6 +76,22 @@ class TestRun(unittest.TestCase):
         self.assertEqual(code, main.EXIT_ERROR)
         self.assertIn("не описан", output)
 
+    def test_order_mode(self):
+        """В режиме порядка загрузки выводится нумерованный список."""
+        code, output = run_quietly(["--package", "A", "--test-repo",
+                                    "--repo", GRAPH, "--order"])
+        self.assertEqual(code, main.EXIT_OK)
+        self.assertIn("1. D", output)
+        self.assertIn("4. A", output)
+        self.assertNotIn("Граф зависимостей", output)
+
+    def test_order_with_cycle(self):
+        """При цикле порядок выводится вместе с найденным циклом."""
+        code, output = run_quietly(["--package", "A", "--test-repo",
+                                    "--repo", CYCLE, "--order"])
+        self.assertEqual(code, main.EXIT_OK)
+        self.assertIn("A -> B -> C -> A", output)
+
     def test_nuget_mode(self):
         """В режиме NuGet выводятся прямые зависимости и граф."""
         with mock.patch.object(main, "NugetSource", FakeSource):

@@ -186,14 +186,16 @@ class TestDownload(unittest.TestCase):
         answer.__enter__.return_value.read.return_value = b"data"
         with mock.patch("urllib.request.urlopen",
                         side_effect=[OSError("сбой"), answer]):
-            self.assertEqual(nuget.download(REPO), b"data")
+            with mock.patch("time.sleep"):
+                self.assertEqual(nuget.download(REPO), b"data")
 
     def test_no_connection(self):
         """Ошибка сети превращается в понятное сообщение."""
         with mock.patch("urllib.request.urlopen",
                         side_effect=OSError("нет сети")):
-            with self.assertRaises(AppError):
-                nuget.download(REPO)
+            with mock.patch("time.sleep"):
+                with self.assertRaises(AppError):
+                    nuget.download(REPO)
 
 
 if __name__ == "__main__":

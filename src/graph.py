@@ -60,3 +60,29 @@ def find_cycles(graph, root):
     cycles = []
     search_cycles(graph, root, [], set(), cycles)
     return cycles
+
+
+def visit_for_order(graph, name, visiting, order):
+    """Добавляет в порядок загрузки сначала зависимости, затем сам пакет.
+
+    visiting — пакеты, обход которых ещё не закончен. Если пакет
+    встретился повторно, пока его обход не закончен, это цикл, и
+    повторный вход пропускается.
+    """
+    if name in order or name in visiting:
+        return
+    visiting.add(name)
+    for dependency in graph.get(name, []):
+        visit_for_order(graph, dependency, visiting, order)
+    visiting.remove(name)
+    order.append(name)
+
+
+def load_order(graph, root):
+    """Возвращает порядок загрузки: зависимости раньше пакетов.
+
+    Анализируемый пакет загружается последним.
+    """
+    order = []
+    visit_for_order(graph, root, set(), order)
+    return order

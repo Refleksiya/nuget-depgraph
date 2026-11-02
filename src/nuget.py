@@ -2,6 +2,7 @@
 
 import io
 import json
+import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as element_tree
@@ -10,7 +11,8 @@ import zipfile
 from errors import AppError
 
 TIMEOUT_SECONDS = 30
-ATTEMPTS = 3
+ATTEMPTS = 5
+PAUSE_SECONDS = 2
 HTTP_NOT_FOUND = 404
 NUSPEC_EXTENSION = ".nuspec"
 DEPENDENCIES_TAG = "dependencies"
@@ -50,7 +52,7 @@ def download_once(url):
 def download(url):
     """Скачивает данные по адресу. Если там ничего нет, возвращает None.
 
-    При сбое сети делается несколько попыток.
+    При сбое сети делается несколько попыток с паузой между ними.
     """
     for attempt in range(1, ATTEMPTS + 1):
         try:
@@ -58,6 +60,7 @@ def download(url):
         except AppError:
             if attempt == ATTEMPTS:
                 raise
+            time.sleep(PAUSE_SECONDS)
     return None
 
 

@@ -21,13 +21,17 @@ NOT_SET = "не задана"
 class Config:
     """Набор проверенных параметров, заданных пользователем."""
 
-    def __init__(self, package, version, repo, test_repo, tree, depth):
-        """Сохраняет значения всех параметров приложения."""
+    def __init__(self, package, version, repo, modes, depth):
+        """Сохраняет значения всех параметров приложения.
+
+        modes — словарь включённых режимов: test_repo, tree, order.
+        """
         self.package = package
         self.version = version
         self.repo = repo
-        self.test_repo = test_repo
-        self.tree = tree
+        self.test_repo = modes["test_repo"]
+        self.tree = modes["tree"]
+        self.order = modes["order"]
         self.depth = depth
 
 
@@ -48,6 +52,8 @@ def build_parser():
                         help="режим работы с тестовым репозиторием")
     parser.add_argument("--tree", action="store_true",
                         help="вывод зависимостей в виде ASCII-дерева")
+    parser.add_argument("--order", action="store_true",
+                        help="вывод порядка загрузки зависимостей")
     parser.add_argument("--max-depth", default=DEFAULT_DEPTH,
                         help="максимальная глубина анализа (1-10)")
     return parser
@@ -106,8 +112,11 @@ def build_config(argv):
         package=check_package(args.package),
         version=check_version(args.version, args.test_repo),
         repo=check_repo(args.repo, args.test_repo),
-        test_repo=args.test_repo,
-        tree=args.tree,
+        modes={
+            "test_repo": args.test_repo,
+            "tree": args.tree,
+            "order": args.order,
+        },
         depth=check_depth(args.max_depth),
     )
 
@@ -125,5 +134,6 @@ def describe(config):
         f"repo = {config.repo}",
         f"test-repo = {flag(config.test_repo)}",
         f"tree = {flag(config.tree)}",
+        f"order = {flag(config.order)}",
         f"max-depth = {config.depth}",
     ]

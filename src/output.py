@@ -1,7 +1,7 @@
 """Вывод результатов работы приложения на экран."""
 
 from config import describe
-from graph import boundary_packages, find_cycles
+from graph import boundary_packages, find_cycles, load_order
 from nuget import unique_dependencies
 
 NO_DEPENDENCIES = "зависимостей нет"
@@ -102,3 +102,15 @@ def print_graph(source, graph, config):
               "глубина):")
         print_items("", labels)
     print_cycles(graph, config.package)
+
+
+def print_order(source, graph, config):
+    """Выводит порядок загрузки зависимостей анализируемого пакета."""
+    print(f"\nПорядок загрузки зависимостей {config.package} "
+          f"(максимальная глубина {config.depth}):")
+    for number, name in enumerate(load_order(graph, config.package), 1):
+        print(f"  {number}. {source.label(name)}")
+    if find_cycles(graph, config.package):
+        print("Пакеты цикла нельзя упорядочить строго: цикл разорван "
+              "в месте повторного входа.")
+        print_cycles(graph, config.package)
