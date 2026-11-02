@@ -1,8 +1,10 @@
 """Вывод результатов работы приложения на экран."""
 
 from config import describe
+from dot import to_dot
 from graph import boundary_packages, find_cycles, load_order
 from nuget import unique_dependencies
+from tree import build_tree
 
 NO_DEPENDENCIES = "зависимостей нет"
 LEAF = "нет зависимостей"
@@ -114,3 +116,17 @@ def print_order(source, graph, config):
         print("Пакеты цикла нельзя упорядочить строго: цикл разорван "
               "в месте повторного входа.")
         print_cycles(graph, config.package)
+
+
+def print_dot(source, graph, config):
+    """Выводит граф на языке Graphviz (DOT)."""
+    print("\nГраф на языке Graphviz:")
+    for line in to_dot(source, graph, config.package):
+        print(line)
+
+
+def print_tree(source, graph, config):
+    """Выводит зависимости в виде ASCII-дерева."""
+    print("\nДерево зависимостей:")
+    for prefix, name, mark in build_tree(graph, config.package):
+        print(f"{prefix}{source.label(name)}{mark}")

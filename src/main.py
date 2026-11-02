@@ -10,8 +10,10 @@ from nuget_source import NugetSource
 from output import (
     print_config,
     print_dependencies,
+    print_dot,
     print_graph,
     print_order,
+    print_tree,
 )
 
 EXIT_OK = 0
@@ -26,13 +28,17 @@ def make_source(config):
 
 
 def print_results(config, source, graph):
-    """Выводит порядок загрузки или прямые зависимости и граф."""
+    """Выводит порядок загрузки или прямые зависимости, граф,
+    его описание на языке Graphviz и, если нужно, ASCII-дерево."""
     if config.order:
         print_order(source, graph, config)
         return
     if not config.test_repo:
         print_dependencies(config, source.groups[config.package])
     print_graph(source, graph, config)
+    print_dot(source, graph, config)
+    if config.tree:
+        print_tree(source, graph, config)
 
 
 def run(argv):

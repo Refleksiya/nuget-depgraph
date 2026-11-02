@@ -21,6 +21,9 @@
    тестового репозитория.
 4. **Дополнительные операции** — режим вывода порядка загрузки
    зависимостей (`--order`) и сравнение с реальным менеджером пакетов.
+5. **Визуализация** — описание графа на языке Graphviz и, с параметром
+   `--tree`, ASCII-дерево зависимостей; сравнение со штатными
+   средствами визуализации.
 
 ## Функции и настройки
 
@@ -174,6 +177,52 @@ dotnet list package --include-transitive
 6. **Циклы.** Встретив цикл, NuGet останавливается с ошибкой (NU1108),
    а приложение разрывает цикл и выводит порядок для остальных пакетов.
 
+## Визуализация (этап 5)
+
+После графа приложение всегда печатает его описание на языке Graphviz
+(DOT, `src/dot.py`):
+
+- каждая зависимость — ребро `"пакет" -> "зависимость";`;
+- пакеты, зависимости которых не загружались из-за максимальной
+  глубины, рисуются пунктиром (`[style=dashed]`);
+- пакет без зависимостей всё равно попадает на граф отдельной вершиной.
+
+С параметром `--tree` дополнительно выводится ASCII-дерево
+(`src/tree.py`). Дерево строится обходом в глубину от анализируемого
+пакета. Пакет, который уже был раскрыт выше, второй раз не раскрывается
+и помечается `(повтор)`, а возврат к пакету на пути от корня —
+`(цикл)`. Поэтому дерево всегда конечное, даже при циклах.
+
+Нарисовать картинку из описания можно штатной программой Graphviz
+(`brew install graphviz` на macOS):
+
+```
+./run.sh --package Serilog --version 3.1.1 --max-depth 2 | sed -n '/^digraph/,/^}/p' | dot -Tpng -o /tmp/serilog.png
+open /tmp/serilog.png
+```
+
+Описание можно также вставить в любой онлайн-просмотрщик Graphviz.
+
+### Сравнение со штатными средствами визуализации
+
+1. **Graphviz (`dot`)** рисует граф по нашему описанию. На картинке
+   каждый пакет — одна вершина, а общая зависимость получает несколько
+   входящих стрелок. В ASCII-дереве та же зависимость встречается
+   несколько раз (повторы помечены), потому что дерево не умеет
+   сходиться в одну вершину. Цикл на картинке — обратная стрелка, в
+   дереве — пометка `(цикл)`.
+2. **`dotnet list package --include-transitive`** (штатный вывод NuGet)
+   показывает плоский список: прямые пакеты и транзитивные, без
+   связей «кто от кого зависит» и только для одной платформы проекта.
+   Поэтому пакетов в нём меньше, а структуры графа не видно.
+3. **Страница пакета на nuget.org** (вкладка Dependencies) показывает
+   только прямые зависимости, сгруппированные по платформам, без
+   транзитивных. Это совпадает с выводом этапа 2, но не с графом.
+4. Приложение объединяет зависимости всех платформ и ограничивает
+   глубину, поэтому на графе есть пакеты для старых платформ
+   (`System.ValueTuple`, `NETStandard.Library`) и пунктирные вершины —
+   у штатных средств их нет.
+
 ## Структура
 
 ```
@@ -182,6 +231,8 @@ src/nuget.py         — скачивание пакета, разбор зав�
 src/nuget_source.py  — зависимости из репозитория NuGet для построения графа
 src/file_source.py   — зависимости из файла тестового репозитория
 src/graph.py         — построение графа (BFS с рекурсией) и поиск циклов
+src/dot.py           — описание графа на языке Graphviz
+src/tree.py          — ASCII-дерево зависимостей
 src/output.py        — вывод результатов на экран
 src/main.py          — точка входа
 src/errors.py        — класс ошибки
@@ -446,3 +497,111 @@ $ ./run.sh --package Serilog --version 3.1.1 --order --max-depth 2
 
 Скрипты этапа 4: `test_order_simple`, `test_order_cycle`,
 `test_order_complex`, `test_order_serilog`, `test_order_logging`.
+
+Визуализация тестового графа с двумя циклами (этап 5):
+
+```
+$ ./run.sh --package A --test-repo --repo examples/complex.txt --max-depth 5 --tree
+...
+Граф на языке Graphviz:
+digraph "A" {
+    "A" -> "B";
+    "A" -> "C";
+    "A" -> "D";
+    "B" -> "E";
+    "B" -> "F";
+    "C" -> "F";
+    "C" -> "G";
+    "D" -> "H";
+    "F" -> "I";
+    "G" -> "C";
+    "H" -> "A";
+}
+
+Дерево зависимостей:
+A
+├── B
+│   ├── E
+│   └── F
+│       └── I
+├── C
+│   ├── F (повтор)
+│   └── G
+│       └── C (цикл)
+└── D
+    └── H
+        └── A (цикл)
+```
+
+Пакет 1 — Serilog 3.1.1:
+
+```
+$ ./run.sh --package Serilog --version 3.1.1 --max-depth 2 --tree
+...
+digraph "Serilog" {
+    "Serilog 3.1.1" -> "System.Diagnostics.DiagnosticSource 7.0.2";
+    "Serilog 3.1.1" -> "System.ValueTuple 4.5.0";
+    "System.Diagnostics.DiagnosticSource 7.0.2" -> "System.Memory 4.5.5";
+    "System.Diagnostics.DiagnosticSource 7.0.2" -> "System.Runtime.CompilerServices.Unsafe 6.0.0";
+    "System.ValueTuple 4.5.0" -> "NETStandard.Library 1.6.1";
+    "System.Memory 4.5.5" [style=dashed];
+    "System.Runtime.CompilerServices.Unsafe 6.0.0" [style=dashed];
+    "NETStandard.Library 1.6.1" [style=dashed];
+}
+
+Дерево зависимостей:
+Serilog 3.1.1
+├── System.Diagnostics.DiagnosticSource 7.0.2
+│   ├── System.Memory 4.5.5
+│   └── System.Runtime.CompilerServices.Unsafe 6.0.0
+└── System.ValueTuple 4.5.0
+    └── NETStandard.Library 1.6.1
+```
+
+Пакет 2 — Newtonsoft.Json 13.0.3 (дерево):
+
+```
+$ ./run.sh --package Newtonsoft.Json --version 13.0.3 --max-depth 1 --tree
+...
+Дерево зависимостей:
+Newtonsoft.Json 13.0.3
+├── Microsoft.CSharp 4.3.0
+├── NETStandard.Library 1.6.1
+├── System.ComponentModel.TypeConverter 4.3.0
+├── System.Runtime.Serialization.Primitives 4.3.0
+├── System.Runtime.Serialization.Formatters 4.3.0
+└── System.Xml.XmlDocument 4.3.0
+```
+
+Пакет 3 — Microsoft.Extensions.Logging 8.0.0 (дерево):
+
+```
+$ ./run.sh --package Microsoft.Extensions.Logging --version 8.0.0 --max-depth 2 --tree
+...
+Дерево зависимостей:
+Microsoft.Extensions.Logging 8.0.0
+├── Microsoft.Bcl.AsyncInterfaces 8.0.0
+│   └── System.Threading.Tasks.Extensions 4.5.4
+├── Microsoft.Extensions.DependencyInjection 8.0.0
+│   ├── Microsoft.Bcl.AsyncInterfaces 8.0.0 (повтор)
+│   ├── Microsoft.Extensions.DependencyInjection.Abstractions 8.0.0
+│   └── System.Threading.Tasks.Extensions 4.5.4 (повтор)
+├── Microsoft.Extensions.Logging.Abstractions 8.0.0
+│   ├── Microsoft.Extensions.DependencyInjection.Abstractions 8.0.0 (повтор)
+│   ├── System.Buffers 4.5.1
+│   └── System.Memory 4.5.5
+├── Microsoft.Extensions.Options 8.0.0
+│   ├── Microsoft.Extensions.DependencyInjection.Abstractions 8.0.0 (повтор)
+│   ├── Microsoft.Extensions.Primitives 8.0.0
+│   ├── System.ValueTuple 4.5.0
+│   │   └── NETStandard.Library 1.6.1
+│   └── System.ComponentModel.Annotations 5.0.0
+├── System.Diagnostics.DiagnosticSource 8.0.0
+│   ├── System.Memory 4.5.5 (повтор)
+│   └── System.Runtime.CompilerServices.Unsafe 6.0.0
+└── System.ValueTuple 4.5.0 (повтор)
+dot not found
+```
+
+Скрипты этапа 5: `test_viz_complex`, `test_viz_serilog`,
+`test_viz_newtonsoft`, `test_viz_logging`.

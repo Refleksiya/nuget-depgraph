@@ -92,6 +92,23 @@ class TestRun(unittest.TestCase):
         self.assertEqual(code, main.EXIT_OK)
         self.assertIn("A -> B -> C -> A", output)
 
+    def test_graphviz_printed(self):
+        """В режиме графа выводится описание на языке Graphviz."""
+        code, output = run_quietly(["--package", "A", "--test-repo",
+                                    "--repo", GRAPH])
+        self.assertEqual(code, main.EXIT_OK)
+        self.assertIn('digraph "A" {', output)
+        self.assertIn('"A" -> "B";', output)
+        self.assertNotIn("Дерево зависимостей", output)
+
+    def test_tree_printed(self):
+        """С параметром --tree выводится ASCII-дерево."""
+        code, output = run_quietly(["--package", "A", "--test-repo",
+                                    "--repo", GRAPH, "--tree"])
+        self.assertEqual(code, main.EXIT_OK)
+        self.assertIn("├── B", output)
+        self.assertIn("└── D (повтор)", output)
+
     def test_nuget_mode(self):
         """В режиме NuGet выводятся прямые зависимости и граф."""
         with mock.patch.object(main, "NugetSource", FakeSource):
