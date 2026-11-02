@@ -10,6 +10,7 @@ import zipfile
 from errors import AppError
 
 TIMEOUT_SECONDS = 30
+ATTEMPTS = 3
 HTTP_NOT_FOUND = 404
 NUSPEC_EXTENSION = ".nuspec"
 DEPENDENCIES_TAG = "dependencies"
@@ -33,8 +34,8 @@ class Dependency:
         self.version = version
 
 
-def download(url):
-    """Скачивает данные по адресу. Если там ничего нет, возвращает None."""
+def download_once(url):
+    """Делает одну попытку скачать данные по адресу."""
     try:
         with urllib.request.urlopen(url, timeout=TIMEOUT_SECONDS) as answer:
             return answer.read()
@@ -44,6 +45,20 @@ def download(url):
         raise AppError(f"репозиторий вернул ошибку HTTP {error.code}: {url}")
     except OSError as error:
         raise AppError(f"не удалось подключиться к репозиторию: {error}")
+
+
+def download(url):
+    """Скачивает данные по адресу. Если там ничего нет, возвращает None.
+
+    При сбое сети делается несколько попыток.
+    """
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            return download_once(url)
+        except AppError:
+            if attempt == ATTEMPTS:
+                raise
+    return None
 
 
 def normalize_version(version):
@@ -157,20 +172,67 @@ def parse_dependencies(nuspec):
     return {}
 
 
-def unique_dependencies(groups):
-    """Собирает имена зависимостей из всех групп без повторов."""
+def merge_groups(groups):
+    """Объединяет зависимости всех платформ в один список без повторов."""
+    merged = []
     names = []
     for dependencies in groups.values():
         for dependency in dependencies:
             if dependency.name not in names:
                 names.append(dependency.name)
-    return names
+                merged.append(dependency)
+    return merged
+
+
+def unique_dependencies(groups):
+    """Собирает имена зависимостей из всех групп без повторов."""
+    return [dependency.name for dependency in merge_groups(groups)]
+
+
+def download_dependencies(repo, package, version):
+    """Скачивает архив пакета точной версии и разбирает его зависимости."""
+    archive_data = download(package_url(repo, package, version))
+    if archive_data is None:
+        raise AppError(f"архив пакета {package} {version} не найден")
+    return parse_dependencies(read_nuspec(archive_data))
 
 
 def get_direct_dependencies(repo, package, version):
     """Скачивает пакет заданной версии и возвращает его зависимости."""
     found = find_version(fetch_versions(repo, package), version)
-    archive_data = download(package_url(repo, package, found))
-    if archive_data is None:
-        raise AppError(f"архив пакета {package} {found} не найден")
-    return parse_dependencies(read_nuspec(archive_data))
+    return download_dependencies(repo, package, found)
+
+
+def version_key(version):
+    """Превращает версию в кортеж чисел, чтобы версии можно было сравнить."""
+    release = version.partition("-")[0]
+    return tuple(int(part) for part in release.split(".") if part.isdigit())
+
+
+def lower_bound(version_range):
+    """Возвращает нижнюю границу диапазона версий и признак её включения."""
+    text = version_range.strip()
+    if text == ANY_VERSION:
+        return "", True
+    inclusive = not text.startswith("(")
+    lower = text.strip("[]()").split(",")[0].strip()
+    return lower, inclusive
+
+
+def fits_lower_bound(version, lower, inclusive):
+    """Проверяет, что версия не ниже нижней границы диапазона."""
+    if not lower:
+        return True
+    if inclusive:
+        return version_key(version) >= version_key(lower)
+    return version_key(version) > version_key(lower)
+
+
+def choose_version(versions, version_range):
+    """Выбирает наименьшую подходящую версию, как это делает NuGet."""
+    lower, inclusive = lower_bound(version_range)
+    candidates = stable_versions(versions) or versions
+    for version in sorted(candidates, key=version_key):
+        if fits_lower_bound(version, lower, inclusive):
+            return version
+    raise AppError(f"нет версии, подходящей под диапазон {version_range}")

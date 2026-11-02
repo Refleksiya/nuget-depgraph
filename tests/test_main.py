@@ -12,7 +12,27 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import main
 from nuget import Dependency
 
-GRAPH = str(Path(__file__).parent / "data" / "graph.txt")
+DATA = Path(__file__).parent / "data"
+GRAPH = str(DATA / "graph.txt")
+CYCLE = str(DATA / "cycle.txt")
+
+
+class FakeSource:
+    """Подменный репозиторий NuGet из одного пакета с одной зависимостью."""
+
+    def __init__(self, repo, package, version):
+        """Запоминает корневой пакет и его зависимости по платформам."""
+        self.groups = {package: {"net8.0": [Dependency("First", "1.0.0")]}}
+
+    def dependencies(self, name):
+        """Возвращает зависимости: у First их нет."""
+        if name == "First":
+            return []
+        return ["First"]
+
+    def label(self, name):
+        """Возвращает подпись пакета с условной версией."""
+        return f"{name} 1.0.0"
 
 
 def run_quietly(argv):
@@ -34,31 +54,36 @@ class TestRun(unittest.TestCase):
         self.assertIn("Ошибка", output)
 
     def test_test_mode(self):
-        """В тестовом режиме выводятся параметры и код 0."""
+        """В тестовом режиме выводится граф из файла."""
         code, output = run_quietly(["--package", "A", "--test-repo",
                                     "--repo", GRAPH])
         self.assertEqual(code, main.EXIT_OK)
         self.assertIn("package = A", output)
+        self.assertIn("A -> B, C", output)
+        self.assertIn("не найдены", output)
 
-    def test_dependencies_printed(self):
-        """Прямые зависимости выводятся на экран."""
-        groups = {"net8.0": [Dependency("First", "1.0.0")]}
-        with mock.patch.object(main, "get_direct_dependencies",
-                               return_value=groups):
+    def test_cycle_printed(self):
+        """Найденный цикл выводится на экран."""
+        code, output = run_quietly(["--package", "A", "--test-repo",
+                                    "--repo", CYCLE])
+        self.assertEqual(code, main.EXIT_OK)
+        self.assertIn("A -> B -> C -> A", output)
+
+    def test_unknown_test_package(self):
+        """Пакет, которого нет в тестовом файле, вызывает ошибку."""
+        code, output = run_quietly(["--package", "Z", "--test-repo",
+                                    "--repo", GRAPH])
+        self.assertEqual(code, main.EXIT_ERROR)
+        self.assertIn("не описан", output)
+
+    def test_nuget_mode(self):
+        """В режиме NuGet выводятся прямые зависимости и граф."""
+        with mock.patch.object(main, "NugetSource", FakeSource):
             code, output = run_quietly(["--package", "Demo",
                                         "--version", "1.0.0"])
         self.assertEqual(code, main.EXIT_OK)
-        self.assertIn("[net8.0]", output)
         self.assertIn("First (версия: 1.0.0)", output)
-
-    def test_no_dependencies(self):
-        """Для пакета без зависимостей выводится сообщение."""
-        with mock.patch.object(main, "get_direct_dependencies",
-                               return_value={}):
-            code, output = run_quietly(["--package", "Demo",
-                                        "--version", "1.0.0"])
-        self.assertEqual(code, main.EXIT_OK)
-        self.assertIn("зависимостей нет", output)
+        self.assertIn("Demo 1.0.0 -> First 1.0.0", output)
 
 
 if __name__ == "__main__":

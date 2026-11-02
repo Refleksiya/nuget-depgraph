@@ -2,43 +2,29 @@
 
 import sys
 
-from config import build_config, describe
+from config import build_config
 from errors import AppError
-from nuget import get_direct_dependencies, unique_dependencies
+from file_source import FileSource
+from graph import build_graph
+from nuget_source import NugetSource
+from output import print_config, print_dependencies, print_graph
 
 EXIT_OK = 0
 EXIT_ERROR = 1
-TEST_MODE_NOTE = "Тестовый репозиторий будет разобран на этапе 3."
 
 
-def print_config(config):
-    """Выводит все параметры запуска в формате ключ-значение."""
-    print("Параметры запуска:")
-    for line in describe(config):
-        print(f"  {line}")
+def make_source(config):
+    """Выбирает источник зависимостей: тестовый файл или репозиторий."""
+    if config.test_repo:
+        return FileSource(config.repo, config.package)
+    return NugetSource(config.repo, config.package, config.version)
 
 
-def format_dependency(dependency):
-    """Готовит строку с именем зависимости и её версиями."""
-    return f"{dependency.name} (версия: {dependency.version})"
-
-
-def print_dependencies(config, groups):
-    """Выводит прямые зависимости по платформам и общий список."""
-    print(f"\nПрямые зависимости {config.package} {config.version}:")
-    if not groups:
-        print("  зависимостей нет")
-        return
-    for framework, dependencies in groups.items():
-        print(f"  [{framework}]")
-        if not dependencies:
-            print("    зависимостей нет")
-        for dependency in dependencies:
-            print(f"    {format_dependency(dependency)}")
-    names = unique_dependencies(groups)
-    print(f"\nВсего различных прямых зависимостей: {len(names)}")
-    for name in names:
-        print(f"  {name}")
+def print_results(config, source, graph):
+    """Выводит прямые зависимости и граф зависимостей."""
+    if not config.test_repo:
+        print_dependencies(config, source.groups[config.package])
+    print_graph(source, graph, config)
 
 
 def run(argv):
@@ -46,17 +32,13 @@ def run(argv):
     try:
         config = build_config(argv)
         print_config(config)
-        if config.test_repo:
-            print(TEST_MODE_NOTE)
-            return EXIT_OK
-        groups = get_direct_dependencies(
-            config.repo, config.package, config.version
-        )
+        source = make_source(config)
+        graph = build_graph(source, config.package, config.depth)
     except AppError as error:
         sys.stdout.flush()
         print(f"Ошибка: {error}", file=sys.stderr)
         return EXIT_ERROR
-    print_dependencies(config, groups)
+    print_results(config, source, graph)
     return EXIT_OK
 
 
